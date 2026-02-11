@@ -46,7 +46,7 @@ const char* phrases[] = {"You are loved", "You are beautiful", "You are stunning
 int phrase_memory[20] = {};
 
 
-Button button_a(Pin::A, Polarity::ACTIVE_LOW);
+Button button_a(Pin::A);
 Button button_b(Pin::B);
 Button button_c(Pin::C);
 Button button_d(Pin::D);
@@ -64,16 +64,16 @@ int main() {
 
     graphics.set_pen(0);
     graphics.set_font("bitmap8");
-    graphics.text("Press any button for motivation", {0, 40}, 296, 3);
+    graphics.text("Press A for motivation", {0, 40}, 296, 3);
 
     display.update(&graphics);
 
     //set up an index to track phrase memory
     int mem_index = 0;
     int rand_num = 0;
+    
 
     while (true) {
-        
         if (button_a.read()) {
             //Make sure screen is clear and pen color is set to black
             graphics.set_pen(15);
@@ -82,16 +82,32 @@ int main() {
 
             //get random number to choose a phrase, track used words in phrase_memory
             rand_num = (get_rand_32() % std::size(phrases));
-            
+            for (int i = 0; i < std::size(phrase_memory); i++) {
+                if (phrase_memory[i] == rand_num) {
+                    rand_num = (get_rand_32() % std::size(phrases));
+                    i = 0; //reset loop to check new random number against memory
+                }
+            }
+
+            phrase_memory[mem_index] = rand_num; //store new random number in memory
+            if (mem_index < std::size(phrase_memory) - 1) {
+                mem_index++;
+            } else {
+                mem_index = 0; //reset memory index if we reach the end of the array
+            }
+            //Print out phrase memory for debugging
+            // std::string phrase_memory_str = "";
+            // for (int i = 0; i < std::size(phrase_memory); i++) {
+            //     phrase_memory_str += std::to_string(phrase_memory[i]) + " ";
+            // }
+            //graphics.text(phrase_memory_str, {0, 100}, 296, 1);
+
             graphics.text(phrases[rand_num], {0, 0}, 296, 3);
             display.update(&graphics);
         }
         sleep_ms(10); //Check buttons every 10ms
-        
     
-
-    
+    }
 
     return 0;
-}
 }
