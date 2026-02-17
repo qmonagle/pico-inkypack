@@ -3,11 +3,18 @@
 #include <vector>
 #include <cstdlib>
 #include <algorithm>
+#include <hardware/adc.h>
+#include <stdio.h>
 
 #include "pico/rand.h"
 #include "uc8151.hpp"
 #include "libraries/pico_graphics/pico_graphics.hpp"
 #include "button.hpp"
+
+#define Batt_x_loc 250
+#define Batt_y_loc 110
+
+
 
 
 using namespace pimoroni;
@@ -52,19 +59,61 @@ Button button_c(Pin::C);
 Button button_d(Pin::D);
 Button button_e(Pin::E);
 
+uint16_t Batt_Read(float conversion_factor, float max_voltage, float min_voltage){
+        //This function requires ADC 3, GPIO 29 to be configured
+        uint16_t raw_value = adc_read();
+        uint16_t batt_percent = (((raw_value * conversion_factor) - min_voltage) / (max_voltage - min_voltage)) * 100;
 
+        if (batt_percent > 100){
+            batt_percent = 100;
+        }
+
+        return batt_percent;
+    }
 
 int main() {
+
+    //Set up internal ADC pin to monitor system voltage
+    adc_init();
+    adc_gpio_init(29);
+    adc_select_input(3);
+
+    gpio_init(24);
+    gpio_set_dir(24, GPIO_IN);
+    gpio_pull_down(24);
+    bool ChargeState = gpio_get(24);
+    
+    const float conversion_factor = (3 * 3.3) / 4095;
+    const float max_voltage = 4.2; //max voltage/full battery
+    const float min_voltage = 3.2; //min voltage/dead battery
+
 
     //Set update speed for display (0 = slowest, 3 = fastest)
     display.set_update_speed(2);
 
     graphics.set_pen(15);
     graphics.clear();
-
     graphics.set_pen(0);
     graphics.set_font("bitmap8");
+
     graphics.text("Press A for motivation", {0, 40}, 296, 3);
+
+    
+
+    //Read system voltage for initial battery percentage display on startup
+    
+    
+    //calculate batt percent
+    uint16_t batt_percent = Batt_Read(conversion_factor, max_voltage, min_voltage);
+    if(ChargeState){
+        graphics.text("Charging", {(Batt_x_loc), Batt_y_loc + 5}, 296, 1);
+    }else{
+        graphics.text("Batt " + std::to_string(batt_percent) + "%", {Batt_x_loc, Batt_y_loc}, 296, 1);
+    }
+    
+    
+
+    
 
     display.update(&graphics);
 
@@ -80,6 +129,9 @@ int main() {
             graphics.clear();
             graphics.set_pen(0);
 
+            //read charging pin
+            ChargeState = gpio_get(24);
+
             //get random number to choose a phrase, track used words in phrase_memory
             rand_num = (get_rand_32() % std::size(phrases));
             for (int i = 0; i < std::size(phrase_memory); i++) {
@@ -93,7 +145,8 @@ int main() {
             if (mem_index < std::size(phrase_memory) - 1) {
                 mem_index++;
             } else {
-                mem_index = 0; //reset memory index if we reach the end of the array
+                mem_index = 0; //reset memory index if we reach the end of the array. Also update batt percentage.
+                batt_percent = Batt_Read(conversion_factor, max_voltage, min_voltage);
             }
             //Print out phrase memory for debugging
             // std::string phrase_memory_str = "";
@@ -102,7 +155,15 @@ int main() {
             // }
             //graphics.text(phrase_memory_str, {0, 100}, 296, 1);
 
+            // print out random phrase and latest battery percent
             graphics.text(phrases[rand_num], {0, 0}, 296, 3);
+
+            if(ChargeState){
+                graphics.text("Charging", {(Batt_x_loc), Batt_y_loc + 5}, 296, 1);
+            }else{
+                graphics.text(std::to_string(batt_percent) + "%", {Batt_x_loc, Batt_y_loc}, 296, 2);
+            }
+           
             display.update(&graphics);
         }
         sleep_ms(10); //Check buttons every 10ms
