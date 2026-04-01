@@ -5,7 +5,9 @@
 #include <algorithm>
 #include <hardware/adc.h>
 #include <stdio.h>
+#include <hardware/rtc.h>
 
+#include "pico/sleep.h"
 #include "pico/rand.h"
 #include "uc8151.hpp"
 #include "libraries/pico_graphics/pico_graphics.hpp"
@@ -15,6 +17,11 @@
 #define Batt_y_loc 110
 
 
+
+// Callback function for the GPIO interrupt
+//void wake_callback(uint gpio, uint32_t events) {
+    // This can be empty; the interrupt itself is what wakes the processor
+//}
 
 
 using namespace pimoroni;
@@ -73,6 +80,10 @@ uint16_t Batt_Read(float conversion_factor, float max_voltage, float min_voltage
 
 int main() {
 
+    
+    stdio_init_all();
+    const uint WAKE_PIN = 13;
+
     //Set up internal ADC pin to monitor system voltage
     adc_init();
     adc_gpio_init(29);
@@ -121,6 +132,12 @@ int main() {
     int mem_index = 0;
     int rand_num = 0;
     
+    //Set up GPIO 17, connected to button B
+    gpio_init(13);
+    gpio_set_dir(13, GPIO_IN);
+
+    //Sleep timer used to trigger dormant mode (deep sleep)
+    int SleepTimer = 0;
 
     while (true) {
         if (button_a.read()) {
@@ -165,9 +182,63 @@ int main() {
             }
            
             display.update(&graphics);
+            SleepTimer = 0;
         }
         sleep_ms(10); //Check buttons every 10ms
-    
+        SleepTimer += 1;
+
+        //Enter dormant mode after some amount of time(unit *10ms) since last button press
+        if(SleepTimer >= 6000){
+            
+
+            //Clear screen
+            graphics.set_pen(15);
+            graphics.clear();
+            graphics.set_pen(0);
+            
+
+
+            //Reprint existing text with updated sleep status after clear screen. Avoids potential for overlapping sleep status text.
+            graphics.text(phrases[rand_num], {0, 0}, 296, 3);
+            if(ChargeState){
+                graphics.text("Charging", {(Batt_x_loc), Batt_y_loc + 5}, 296, 1);
+            }else{
+                graphics.text(std::to_string(batt_percent) + "%", {Batt_x_loc, Batt_y_loc}, 296, 2);
+            }
+            //Display sleep status on screen :)
+            graphics.text("Going to sleep! zzzz Press B to wake me up.", {25, Batt_y_loc + 5}, 296, 1);
+            graphics.text("", {25, Batt_y_loc + 5}, 296, 1);
+            display.update(&graphics);
+
+
+            //Run from ring oscillator, just like the examples :)
+            sleep_run_from_xosc();
+            //dormant until pin 13(button B) sees a rising edge
+            sleep_goto_dormant_until_pin(13, 1, true);
+            //Function to get pi pico back up and running
+            sleep_power_up();
+
+
+            //Clear screen
+            graphics.set_pen(15);
+            graphics.clear();
+            graphics.set_pen(0);
+
+
+            //Reprint existing text with updated sleep status after clear screen. Avoids potential for overlapping sleep status text.
+            graphics.text(phrases[rand_num], {0, 0}, 296, 3);
+            if(ChargeState){
+                graphics.text("Charging", {(Batt_x_loc), Batt_y_loc + 5}, 296, 1);
+            }else{
+                graphics.text(std::to_string(batt_percent) + "%", {Batt_x_loc, Batt_y_loc}, 296, 2);
+            }
+            //Display sleep status on screen :)
+            graphics.text("Awake! Press A for more motivation :)", {25, Batt_y_loc + 5}, 296, 1);
+            display.update(&graphics);
+
+
+            SleepTimer = 0;
+        }
     }
 
     return 0;

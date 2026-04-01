@@ -5,6 +5,8 @@ set(NAME FirstProject) # <-- Name your project/executable here!
 
 include(pico_sdk_import.cmake)
 include(pimoroni_pico_import.cmake)
+set(PICO_EXTRAS_FETCH_FROM_GIT ON) 
+include(pico_extras_import.cmake)
 
 # Gooey boilerplate
 project(${NAME} C CXX ASM)
@@ -44,7 +46,11 @@ target_link_libraries(${NAME}
     button 
     uc8151 
     pico_graphics 
-    pico_rand # <-- List libraries here!
+    pico_rand
+    hardware_rtc
+    hardware_rosc
+    hardware_sleep
+    # <-- List libraries here!
 )
 
 # create map/bin/hex file etc.
